@@ -1,5 +1,6 @@
 use chrono::{Duration, NaiveDateTime};
 use std::{
+    collections::HashSet,
     fs::File,
     io::{BufRead, BufReader},
     net::Ipv4Addr,
@@ -60,6 +61,7 @@ fn parse_logfile(path: PathBuf) -> Vec<TarpitLogEntry> {
 fn print_stats(parsed_file: Vec<TarpitLogEntry>) {
     let mut count_connected = 0;
     let mut max_time_spend: Duration = Duration::zero();
+    let mut ip_set: HashSet<Ipv4Addr> = HashSet::new();
     for entry in parsed_file.iter() {
         match entry.action {
             Action::Connect => count_connected += 1,
@@ -70,9 +72,11 @@ fn print_stats(parsed_file: Vec<TarpitLogEntry>) {
         } else {
             max_time_spend = entry.duration;
         }
+        ip_set.insert(entry.ip);
     }
     println!("Connections: {}", count_connected);
     println!("Max time spend: {}", max_time_spend);
+    println!("Count of different IPs: {}", ip_set.len());
 }
 
 fn main() {
