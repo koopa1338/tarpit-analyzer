@@ -5,6 +5,7 @@ use std::{
     io::{BufRead, BufReader},
     net::Ipv4Addr,
     path::PathBuf,
+    str::FromStr,
     time::Duration as StdDuration,
 };
 
@@ -31,29 +32,36 @@ struct TarpitLogEntry {
     action: Action,
 }
 
-fn parse_logfile(path: PathBuf) -> Vec<TarpitLogEntry> {
-    let file = BufReader::new(File::open(path).unwrap());
-    let mut buffer = Vec::new();
-    for line in file.lines() {
+impl FromStr for TarpitLogEntry {
+    type Err = String;
+
+    fn from_str(line: &str) -> Result<Self, Self::Err> {
         let mut items = line
-            .unwrap()
             .split(",")
             .map(|piece| piece.to_owned())
             .collect::<Vec<String>>();
         let timestamp =
             NaiveDateTime::parse_from_str(&items.pop().unwrap(), "%Y-%m-%d %H:%M:%S").unwrap();
-        let ip = items.pop().unwrap().parse().unwrap();
+        let ip: Ipv4Addr = items.pop().unwrap().parse().unwrap();
         let duration = Duration::from_std(StdDuration::from_millis(
             items.pop().unwrap().parse().unwrap(),
         ))
         .unwrap();
         let action = items.pop().unwrap().into();
-        buffer.push(TarpitLogEntry {
+        Ok(TarpitLogEntry {
             timestamp,
             ip,
             duration,
             action,
-        });
+        })
+    }
+}
+
+fn parse_logfile(path: PathBuf) -> Vec<TarpitLogEntry> {
+    let file = BufReader::new(File::open(path).unwrap());
+    let mut buffer: Vec<TarpitLogEntry> = Vec::new();
+    for line in file.lines() {
+        buffer.push(TarpitLogEntry::from_str(line.unwrap().as_str()).unwrap())
     }
     buffer
 }
