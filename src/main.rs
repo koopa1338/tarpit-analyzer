@@ -1,10 +1,7 @@
 use chrono::{Duration, NaiveDateTime};
+use nom::IResult;
 use std::{
-    collections::HashSet,
-    fs::read_to_string,
-    net::Ipv4Addr,
-    path::PathBuf,
-    str::FromStr,
+    collections::HashSet, fs::read_to_string, net::Ipv4Addr, path::PathBuf, str::FromStr,
     time::Duration as StdDuration,
 };
 
@@ -54,6 +51,18 @@ impl FromStr for TarpitLogEntry {
             action,
         })
     }
+}
+
+fn parse_time_stamp(input: &str) -> IResult<&str, NaiveDateTime> {
+    unimplemented!();
+}
+
+fn parse_ipv4(input: &str) -> IResult<&str, Ipv4Addr> {
+    unimplemented!();
+}
+
+fn parse_action(input: &str) -> IResult<&str, Action> {
+    unimplemented!();
 }
 
 fn parse_logfile(path: PathBuf) -> Vec<TarpitLogEntry> {
