@@ -1,8 +1,7 @@
 use chrono::{Duration, NaiveDateTime};
 use std::{
     collections::HashSet,
-    fs::File,
-    io::{BufRead, BufReader},
+    fs::read_to_string,
     net::Ipv4Addr,
     path::PathBuf,
     str::FromStr,
@@ -58,10 +57,10 @@ impl FromStr for TarpitLogEntry {
 }
 
 fn parse_logfile(path: PathBuf) -> Vec<TarpitLogEntry> {
-    let file = BufReader::new(File::open(path).unwrap());
+    let file = read_to_string(path).unwrap();
     let mut buffer: Vec<TarpitLogEntry> = Vec::new();
     for line in file.lines() {
-        buffer.push(TarpitLogEntry::from_str(line.unwrap().as_str()).unwrap())
+        buffer.push(TarpitLogEntry::from_str(line).unwrap())
     }
     buffer
 }
