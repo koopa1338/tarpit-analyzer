@@ -1,25 +1,10 @@
+#![allow(dead_code)]
 use chrono::{Duration, NaiveDateTime};
-use nom::IResult;
 use std::{
-    collections::HashSet, fs::read_to_string, net::Ipv4Addr, path::PathBuf, str::FromStr,
-    time::Duration as StdDuration,
+    collections::HashSet, fs::read_to_string, net::Ipv4Addr, path::PathBuf,
 };
 
-enum Action {
-    Connect,
-    Disconnect,
-    Unknown,
-}
-
-impl From<String> for Action {
-    fn from(action: String) -> Self {
-        match action.as_str() {
-            "connected" => Action::Connect,
-            "disconnected" => Action::Disconnect,
-            _ => Action::Unknown,
-        }
-    }
-}
+use tarpit_analyzer::*;
 
 struct TarpitLogEntry {
     timestamp: NaiveDateTime,
@@ -28,48 +13,45 @@ struct TarpitLogEntry {
     action: Action,
 }
 
-impl FromStr for TarpitLogEntry {
-    type Err = String;
-
-    fn from_str(line: &str) -> Result<Self, Self::Err> {
-        let mut items = line
-            .split(",")
-            .map(|piece| piece.to_owned())
-            .collect::<Vec<String>>();
-        let timestamp =
-            NaiveDateTime::parse_from_str(&items.pop().unwrap(), "%Y-%m-%d %H:%M:%S").unwrap();
-        let ip: Ipv4Addr = items.pop().unwrap().parse().unwrap();
-        let duration = Duration::from_std(StdDuration::from_millis(
-            items.pop().unwrap().parse().unwrap(),
-        ))
-        .unwrap();
-        let action = items.pop().unwrap().into();
-        Ok(TarpitLogEntry {
-            timestamp,
-            ip,
-            duration,
-            action,
-        })
-    }
-}
-
-fn parse_time_stamp(input: &str) -> IResult<&str, NaiveDateTime> {
-    unimplemented!();
-}
-
-fn parse_ipv4(input: &str) -> IResult<&str, Ipv4Addr> {
-    unimplemented!();
-}
-
-fn parse_action(input: &str) -> IResult<&str, Action> {
-    unimplemented!();
-}
+// impl FromStr for TarpitLogEntry {
+//     type Err = String;
+//
+//     fn from_str(line: &str) -> Result<Self, Self::Err> {
+//         let mut items = line
+//             .split(",")
+//             .map(|piece| piece.to_owned())
+//             .collect::<Vec<String>>();
+//         let timestamp =
+//             NaiveDateTime::parse_from_str(&items.pop().unwrap(), "%Y-%m-%d %H:%M:%S").unwrap();
+//         let ip: Ipv4Addr = items.pop().unwrap().parse().unwrap();
+//         let duration = Duration::from_std(StdDuration::from_millis(
+//             items.pop().unwrap().parse().unwrap(),
+//         ))
+//         .unwrap();
+//         let action = items.pop().unwrap().into();
+//         Ok(TarpitLogEntry {
+//             timestamp,
+//             ip,
+//             duration,
+//             action,
+//         })
+//     }
+// }
 
 fn parse_logfile(path: PathBuf) -> Vec<TarpitLogEntry> {
     let file = read_to_string(path).unwrap();
     let mut buffer: Vec<TarpitLogEntry> = Vec::new();
     for line in file.lines() {
-        buffer.push(TarpitLogEntry::from_str(line).unwrap())
+        let (input, action) = parse_action(line).unwrap();
+        let (input, timestamp) = parse_time_stamp(input).unwrap();
+        let (input, ip) = parse_ipv4(input).unwrap();
+        let (_, duration) = parse_duration(input).unwrap();
+        buffer.push(TarpitLogEntry {
+            timestamp,
+            ip,
+            duration,
+            action
+        });
     }
     buffer
 }
