@@ -1,17 +1,9 @@
 #![allow(dead_code)]
-use chrono::{Duration, NaiveDateTime};
-use std::{
-    collections::HashSet, fs::read_to_string, net::Ipv4Addr, path::PathBuf,
-};
+use chrono::Duration;
+use std::{collections::HashSet, fs::read_to_string, net::Ipv4Addr, path::PathBuf};
 
 use tarpit_analyzer::*;
 
-struct TarpitLogEntry {
-    timestamp: NaiveDateTime,
-    ip: Ipv4Addr,
-    duration: Duration,
-    action: Action,
-}
 
 // impl FromStr for TarpitLogEntry {
 //     type Err = String;
@@ -42,16 +34,8 @@ fn parse_logfile(path: PathBuf) -> Vec<TarpitLogEntry> {
     let file = read_to_string(path).unwrap();
     let mut buffer: Vec<TarpitLogEntry> = Vec::new();
     for line in file.lines() {
-        let (input, action) = parse_action(line).unwrap();
-        let (input, timestamp) = parse_time_stamp(input).unwrap();
-        let (input, ip) = parse_ipv4(input).unwrap();
-        let (_, duration) = parse_duration(input).unwrap();
-        buffer.push(TarpitLogEntry {
-            timestamp,
-            ip,
-            duration,
-            action
-        });
+        let log_entry = parse_log_entry(line);
+        buffer.push(log_entry);
     }
     buffer
 }
