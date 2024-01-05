@@ -1,3 +1,3 @@
-# tarpit-analyzer
+# Tarpit log parser
 
-Little utility to get some information of a tarpit log file, still in development.
+A crate with a parsing function and types to parse a tarpit log.
