@@ -2,6 +2,10 @@
 name = "tarpit-log-parser"
 version = "0.1.0"
 edition = "2021"
+authors = ["koopa1338 <sinner1991@gmail.com>"]
+license-file = "LICENSE.md"
+description = "library to parse tarpit log files"
+repository = "https://gitlab.com/koopa1338/tarpit-log-parser"
 
 [dependencies]
 chrono = "0.4.19"
