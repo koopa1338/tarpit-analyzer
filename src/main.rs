@@ -1,93 +1,137 @@
-use chrono::{Duration, NaiveDateTime};
-use std::{
-    collections::HashSet,
-    fs::read_to_string,
-    net::Ipv4Addr,
-    path::PathBuf,
-    str::FromStr,
-    time::Duration as StdDuration,
-};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use nom::branch::alt;
+use nom::bytes::complete::{tag, take_until};
+use nom::character::complete::{char, i32, line_ending, space1, u16, u32, u8};
+use nom::combinator::map;
+use nom::multi::separated_list0;
+use nom::sequence::{delimited, separated_pair, tuple};
+use nom::{Finish, IResult};
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::net::{Ipv4Addr, SocketAddrV4};
 
-enum Action {
+#[cfg(test)]
+mod tests;
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum Action {
     Connect,
     Disconnect,
-    Unknown,
 }
 
-impl From<String> for Action {
-    fn from(action: String) -> Self {
-        match action.as_str() {
-            "connected" => Action::Connect,
-            "disconnected" => Action::Disconnect,
-            _ => Action::Unknown,
-        }
-    }
-}
-
+#[derive(Debug)]
 struct TarpitLogEntry {
     timestamp: NaiveDateTime,
-    ip: Ipv4Addr,
-    duration: Duration,
+    ip: SocketAddrV4,
     action: Action,
+    log_level: LogLevel,
 }
 
-impl FromStr for TarpitLogEntry {
-    type Err = String;
+pub(crate) fn parse_date(input: &str) -> IResult<&str, NaiveDate> {
+    map(
+        tuple((i32, char('-'), u32, char('-'), u32)),
+        |(year, _, month, _, day)| NaiveDate::from_ymd_opt(year, month, day).expect("invalid date"),
+    )(input)
+}
 
-    fn from_str(line: &str) -> Result<Self, Self::Err> {
-        let mut items = line
-            .split(",")
-            .map(|piece| piece.to_owned())
-            .collect::<Vec<String>>();
-        let timestamp =
-            NaiveDateTime::parse_from_str(&items.pop().unwrap(), "%Y-%m-%d %H:%M:%S").unwrap();
-        let ip: Ipv4Addr = items.pop().unwrap().parse().unwrap();
-        let duration = Duration::from_std(StdDuration::from_millis(
-            items.pop().unwrap().parse().unwrap(),
-        ))
-        .unwrap();
-        let action = items.pop().unwrap().into();
-        Ok(TarpitLogEntry {
+pub(crate) fn parse_timestamp(input: &str) -> IResult<&str, NaiveTime> {
+    map(
+        tuple((u32, char(':'), u32, char(':'), u32)),
+        |(hour, _, minute, _, second)| {
+            NaiveTime::from_hms_opt(hour, minute, second).expect("invalid timestamp.")
+        },
+    )(input)
+}
+
+pub(crate) fn parse_datetime(input: &str) -> IResult<&str, NaiveDateTime> {
+    map(
+        separated_pair(parse_date, space1, parse_timestamp),
+        |(date, time)| NaiveDateTime::new(date, time),
+    )(input)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+pub(crate) fn parse_log_level(input: &str) -> IResult<&str, LogLevel> {
+    alt((
+        map(tag("TRACE"), |_| LogLevel::Trace),
+        map(tag("DEBUG"), |_| LogLevel::Debug),
+        map(tag("INFO"), |_| LogLevel::Info),
+        map(tag("WARN"), |_| LogLevel::Warn),
+        map(tag("ERROR"), |_| LogLevel::Error),
+    ))(input)
+}
+
+pub(crate) fn parse_ipv4(input: &str) -> IResult<&str, Ipv4Addr> {
+    map(
+        tuple((u8, char('.'), u8, char('.'), u8, char('.'), u8)),
+        |(u1, _, u2, _, u3, _, u4)| Ipv4Addr::new(u1, u2, u3, u4),
+    )(input)
+}
+
+pub(crate) fn parse_port(input: &str) -> IResult<&str, u16> {
+    u16(input)
+}
+
+pub(crate) fn parse_socket_addr(input: &str) -> IResult<&str, SocketAddrV4> {
+    map(
+        delimited(
+            tag("('"),
+            separated_pair(parse_ipv4, tag("', "), parse_port),
+            char(')'),
+        ),
+        |(addr, port)| SocketAddrV4::new(addr, port),
+    )(input)
+}
+
+pub(crate) fn parse_action(input: &str) -> IResult<&str, Action> {
+    alt((
+        map(tag("disconnected"), |_| Action::Disconnect),
+        map(tag("connected"), |_| Action::Connect),
+    ))(input)
+}
+
+pub(crate) fn parse_log_line(input: &str) -> IResult<&str, TarpitLogEntry> {
+    let (rest, (timestamp, log_level)) =
+        separated_pair(parse_datetime, space1, parse_log_level)(input)?;
+    let (rest, _) = take_until("(")(rest)?;
+    map(
+        separated_pair(parse_socket_addr, space1, parse_action),
+        move |(ip, action)| TarpitLogEntry {
             timestamp,
             ip,
-            duration,
             action,
-        })
-    }
+            log_level,
+        },
+    )(rest)
 }
 
-fn parse_logfile(path: PathBuf) -> Vec<TarpitLogEntry> {
-    let file = read_to_string(path).unwrap();
-    let mut buffer: Vec<TarpitLogEntry> = Vec::new();
-    for line in file.lines() {
-        buffer.push(TarpitLogEntry::from_str(line).unwrap())
-    }
-    buffer
+#[derive(Debug)]
+struct TarpitLog {
+    lines: Vec<TarpitLogEntry>,
 }
 
-fn print_stats(parsed_file: Vec<TarpitLogEntry>) {
-    let mut count_connected = 0;
-    let mut max_time_spend: Duration = Duration::zero();
-    let mut ip_set: HashSet<Ipv4Addr> = HashSet::new();
-    for entry in parsed_file.iter() {
-        match entry.action {
-            Action::Connect => count_connected += 1,
-            _ => {}
-        }
-        if max_time_spend.is_zero() {
-            max_time_spend = Duration::max(max_time_spend, entry.duration);
-        } else {
-            max_time_spend = entry.duration;
-        }
-        ip_set.insert(entry.ip);
-    }
-    println!("Connections: {}", count_connected);
-    println!("Max time spend: {}", max_time_spend);
-    println!("Count of different IPs: {}", ip_set.len());
+pub(crate) fn parse_tarpit_log(input: &str) -> Result<TarpitLog, String> {
+    separated_list0(line_ending, parse_log_line)(input)
+        .finish()
+        .map(|result| TarpitLog { lines: result.1 })
+        .map_err(|e| e.to_string())
 }
 
 fn main() {
-    let file = PathBuf::from("./tarpit.log");
-    let parsed_file = parse_logfile(file);
-    print_stats(parsed_file);
+    let file = std::env::args().nth(1).expect("no log file provided");
+    let mut input: BufReader<File> = BufReader::new(File::open(file).expect("could not open file"));
+    let mut content = String::new();
+    input
+        .read_to_string(&mut content)
+        .expect("cannot read string");
+    let parsed_file = parse_tarpit_log(&content).unwrap();
+    dbg!(parsed_file);
 }
