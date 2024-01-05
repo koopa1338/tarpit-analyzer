@@ -1,4 +1,4 @@
-use crate::{parse_date, parse_datetime, parse_timestamp};
+use crate::parsing::{parse_date, parse_datetime, parse_timestamp};
 use chrono::{NaiveDate, NaiveTime};
 
 #[test]

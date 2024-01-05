@@ -1,31 +1,13 @@
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
-use nom::character::complete::{char, i32, line_ending, space1, u16, u32, u8};
+use nom::character::complete::{char, i32, space1, u16, u32, u8};
 use nom::combinator::map;
-use nom::multi::separated_list0;
 use nom::sequence::{delimited, separated_pair, tuple};
-use nom::{Finish, IResult};
-use std::fs::File;
-use std::io::{BufReader, Read};
+use nom::IResult;
 use std::net::{Ipv4Addr, SocketAddrV4};
 
-#[cfg(test)]
-mod tests;
-
-#[derive(Debug, PartialEq)]
-pub(crate) enum Action {
-    Connect,
-    Disconnect,
-}
-
-#[derive(Debug)]
-struct TarpitLogEntry {
-    timestamp: NaiveDateTime,
-    ip: SocketAddrV4,
-    action: Action,
-    log_level: LogLevel,
-}
+use crate::{Action, TarpitLogEntry, LogLevel};
 
 pub(crate) fn parse_date(input: &str) -> IResult<&str, NaiveDate> {
     map(
@@ -48,15 +30,6 @@ pub(crate) fn parse_datetime(input: &str) -> IResult<&str, NaiveDateTime> {
         separated_pair(parse_date, space1, parse_timestamp),
         |(date, time)| NaiveDateTime::new(date, time),
     )(input)
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum LogLevel {
-    Trace,
-    Debug,
-    Info,
-    Warn,
-    Error,
 }
 
 pub(crate) fn parse_log_level(input: &str) -> IResult<&str, LogLevel> {
@@ -111,27 +84,4 @@ pub(crate) fn parse_log_line(input: &str) -> IResult<&str, TarpitLogEntry> {
             log_level,
         },
     )(rest)
-}
-
-#[derive(Debug)]
-struct TarpitLog {
-    lines: Vec<TarpitLogEntry>,
-}
-
-pub(crate) fn parse_tarpit_log(input: &str) -> Result<TarpitLog, String> {
-    separated_list0(line_ending, parse_log_line)(input)
-        .finish()
-        .map(|result| TarpitLog { lines: result.1 })
-        .map_err(|e| e.to_string())
-}
-
-fn main() {
-    let file = std::env::args().nth(1).expect("no log file provided");
-    let mut input: BufReader<File> = BufReader::new(File::open(file).expect("could not open file"));
-    let mut content = String::new();
-    input
-        .read_to_string(&mut content)
-        .expect("cannot read string");
-    let parsed_file = parse_tarpit_log(&content).unwrap();
-    dbg!(parsed_file);
 }

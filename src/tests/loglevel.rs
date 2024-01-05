@@ -1,4 +1,4 @@
-use crate::{parse_log_level, LogLevel};
+use crate::{parsing::parse_log_level, LogLevel};
 use rstest::rstest;
 
 #[rstest]

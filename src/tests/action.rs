@@ -1,4 +1,4 @@
-use crate::{parse_action, Action};
+use crate::{parsing::parse_action, Action};
 use rstest::rstest;
 
 #[rstest]

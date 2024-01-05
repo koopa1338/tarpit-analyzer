@@ -1,4 +1,4 @@
-use crate::{parse_ipv4, parse_port, parse_socket_addr};
+use crate::parsing::{parse_ipv4, parse_port, parse_socket_addr};
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 #[test]
